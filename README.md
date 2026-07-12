@@ -110,14 +110,42 @@ Then submit requests in plain English:
 Find me software engineer jobs with 3+ years experience posted in the last 24 hours, and email them to me.
 ```
 
+## Daily Automation (Optional Add-On)
+
+The MCP server itself only runs when explicitly invoked through Claude Code—it does not schedule itself. However, since the daily use case is typically identical (same role, same time window, same recipient), the entire workflow can be automated outside the MCP server using the host operating system's native scheduler, removing the need to manually prompt Claude Code every day.
+
+This is not part of the MCP server's core architecture. It is an operating-system-level convenience layer sitting on top of it, included here because it demonstrates a natural extension of an MCP-based agent: once a workflow is reliable enough to trust, it can move from "something you ask for" to "something that just happens."
+
+### How it works (Windows implementation)
+
+1. A PowerShell wrapper script (`set_env_and_run_claude.ps1`) sets the proxy environment variables Claude Code requires when running non-interactively (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`), then invokes Claude Code in headless mode:
+   ```powershell
+   claude -p "Find me software engineer jobs with 3+ years experience posted in the last 24 hours, and email them to me."
+   ```
+2. `register_task.ps1` registers this script with Windows Task Scheduler to run once daily at a fixed time (e.g., 9:00 AM).
+3. Because credentials are already stored in `.claude/settings.local.json`, the scheduled task requires no manual input—it runs silently and delivers the digest to the configured inbox automatically.
+
+### Cross-platform note
+
+Windows Task Scheduler is platform-specific. On macOS/Linux, the equivalent is a `cron` job or a `launchd`/`systemd` timer invoking `claude -p` with the same wrapper logic.
+
+## Future Development Ideas
+
+- A native cross-platform automation script (single wrapper supporting Windows Task Scheduler, cron, and launchd)
+- Additional job sources beyond RemoteOK and WeWorkRemotely
+- Salary-range extraction where available
+- A lightweight web dashboard for reviewing digest history instead of email-only delivery
+
 ## Project Structure
 ```
 job-alert-mcp/
-├── job_alert_server.py      # MCP server implementing prompt, resources, and tools
-├── pyproject.toml           # Project deps (managed by uv)
+├── job_alert_server.py            # MCP server implementing prompt, resources, and tools
+├── set_env_and_run_claude.ps1     # Wrapper script for headless daily automation
+├── register_task.ps1              # Registers the wrapper with Windows Task Scheduler
+├── pyproject.toml                 # Project deps (managed by uv)
 ├── uv.lock
 ├── .python-version
-├── .claude/                 # Claude Code project configuration (commands, settings)
+├── .claude/                        # Claude Code project configuration (commands, settings)
 ├── .gitignore
 └── README.md
 ```
@@ -126,7 +154,7 @@ job-alert-mcp/
 
 - **Experience assessment heuristic**: Neither source provides a structured "years required" field; matching relies on keyword/phrase detection in titles and descriptions. Jobs marked `unspecified` may or may not meet criteria—they are included rather than silently excluded.
 - **Location non-filtering**: Sources focus on remote-first, global positions, yielding worldwide results rather than location-specific listings.
-- **Demonstration scope**: This implementation demonstrates MCP architecture principles, emphasizing correctness and transparency over exhaustive coverage (e.g., limited to two sources and the 24 most recent items).
+- **Demonstration scope**: This implementation demonstrates MCP architecture principles, emphasizing correctness and transparency over exhaustive coverage (e.g., limited to two sources and the most recent items within the configured time window).
 
 ## Educational Context
 
